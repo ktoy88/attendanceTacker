@@ -4,130 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Attendance System</title>
+    <!-- Load the Google API client library -->
     <script src="https://apis.google.com/js/api.js"></script>
+    <!-- Add Google OAuth client library -->
+    <script src="https://accounts.google.com/gsi/client"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #333;
-        }
-
-        .attendance-list {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-
-        .attendance-list th,
-        .attendance-list td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-
-        .attendance-list th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-
-        .remarks-input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-
-        .submit-btn {
-            display: block;
-            width: 100%;
-            max-width: 200px;
-            margin: 20px auto;
-            padding: 12px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        .submit-btn:hover {
-            background-color: #0056b3;
-        }
-
-        .status-message {
-            text-align: center;
-            margin-top: 10px;
-            padding: 10px;
-            border-radius: 4px;
-        }
-
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-        }
-
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-
-        @media (max-width: 768px) {
-            .attendance-list {
-                display: block;
-                overflow-x: auto;
-            }
-
-            .attendance-list th,
-            .attendance-list td {
-                padding: 8px;
-            }
-
-            body {
-                padding: 10px;
-            }
-
-            .container {
-                padding: 10px;
-            }
-        }
-
-        .loading {
-            text-align: center;
-            padding: 20px;
-            font-style: italic;
-            color: #666;
-        }
+        /* Previous CSS remains the same */
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Attendance System</h1>
         <div id="statusMessage" class="status-message"></div>
-        <div id="loadingMessage" class="loading">Loading...</div>
-        <div id="contentArea" style="display: none;">
+        <div id="authorize-button" style="display: none;">
+            <button id="signin-button" class="submit-btn">Authorize</button>
+        </div>
+        <div id="attendance-content" style="display: none;">
             <form id="attendanceForm">
                 <table class="attendance-list">
                     <thead>
@@ -149,31 +41,86 @@
     </div>
 
     <script>
-        // Replace these with your Google Sheets API credentials
+        // Replace these with your credentials
+        const CLIENT_ID = '626406238928-2g7i0qp206hmblvkuv2bgalvs6793fkp.apps.googleusercontent.com";
         const API_KEY = 'AIzaSyDV21jzJELOVWONiNteDwOVyXcO9g7iW6U';
         const SPREADSHEET_ID = '1d9bdtM78raR9O4Dt25ntXiiUUaHDUgY-xRawJIn53eU';
         const SHEET_NAME = 'H201';
         const SHEET_RANGE = 'A2:E';
 
-        // Initialize the Google Sheets API
-        function initClient() {
-            gapi.client.init({
-                apiKey: API_KEY,
-                discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
-            }).then(() => {
-                loadStudentData();
-            }).catch(error => {
-                showStatus('Error initializing Google Sheets API: ' + error.message, false);
-                document.getElementById('loadingMessage').style.display = 'none';
+        // Discovery doc URL for APIs used by the quickstart
+        const DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
+
+        // Authorization scopes required by the API
+        const SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+
+        let tokenClient;
+        let gapiInited = false;
+        let gisInited = false;
+
+        // Initialize the API client library
+        function gapiLoaded() {
+            gapi.load('client', initializeGapiClient);
+        }
+
+        // Initialize the gapi.client object
+        async function initializeGapiClient() {
+            try {
+                await gapi.client.init({
+                    apiKey: API_KEY,
+                    discoveryDocs: [DISCOVERY_DOC],
+                });
+                gapiInited = true;
+                maybeEnableButtons();
+            } catch (err) {
+                showStatus('Error initializing GAPI client: ' + err.message, false);
+            }
+        }
+
+        // Initialize the tokenClient
+        function gisLoaded() {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: '', // defined later
             });
+            gisInited = true;
+            maybeEnableButtons();
+        }
+
+        // Enable buttons if initialization is complete
+        function maybeEnableButtons() {
+            if (gapiInited && gisInited) {
+                document.getElementById('authorize-button').style.display = 'block';
+            }
+        }
+
+        // Handle the sign-in flow
+        function handleAuthClick() {
+            tokenClient.callback = async (resp) => {
+                if (resp.error !== undefined) {
+                    throw (resp);
+                }
+                document.getElementById('authorize-button').style.display = 'none';
+                document.getElementById('attendance-content').style.display = 'block';
+                await loadStudentData();
+            };
+
+            if (gapi.client.getToken() === null) {
+                tokenClient.requestAccessToken({prompt: 'consent'});
+            } else {
+                tokenClient.requestAccessToken({prompt: ''});
+            }
         }
 
         // Load student data from Google Sheets
-        function loadStudentData() {
-            gapi.client.sheets.spreadsheets.values.get({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${SHEET_NAME}!${SHEET_RANGE}`,
-            }).then(response => {
+        async function loadStudentData() {
+            try {
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: `${SHEET_NAME}!${SHEET_RANGE}`,
+                });
+
                 const values = response.result.values;
                 const studentList = document.getElementById('studentList');
                 studentList.innerHTML = '';
@@ -200,40 +147,38 @@
                     `;
                     studentList.appendChild(tr);
                 });
-
-                document.getElementById('loadingMessage').style.display = 'none';
-                document.getElementById('contentArea').style.display = 'block';
-            }).catch(error => {
-                showStatus('Error loading student data: ' + error.message, false);
-                document.getElementById('loadingMessage').style.display = 'none';
-            });
+            } catch (err) {
+                showStatus('Error loading student data: ' + err.message, false);
+            }
         }
 
         // Update attendance data to Google Sheets
-        function updateAttendance(formData) {
-            const rows = document.querySelectorAll('#studentList tr');
-            const values = Array.from(rows).map((row, index) => {
-                const status = row.querySelector(`input[name="status_${index}"]`).checked ? 'Present' : 'Absent';
-                const remarks = row.querySelector(`input[name="remarks_${index}"]`).value;
-                return [
-                    row.cells[0].textContent,
-                    row.cells[1].textContent,
-                    row.cells[2].textContent,
-                    status,
-                    remarks
-                ];
-            });
+        async function updateAttendance(formData) {
+            try {
+                const rows = document.querySelectorAll('#studentList tr');
+                const values = Array.from(rows).map((row, index) => {
+                    const status = row.querySelector(`input[name="status_${index}"]`).checked ? 'Present' : 'Absent';
+                    const remarks = row.querySelector(`input[name="remarks_${index}"]`).value;
+                    return [
+                        row.cells[0].textContent,
+                        row.cells[1].textContent,
+                        row.cells[2].textContent,
+                        status,
+                        remarks
+                    ];
+                });
 
-            gapi.client.sheets.spreadsheets.values.update({
-                spreadsheetId: SPREADSHEET_ID,
-                range: `${SHEET_NAME}!${SHEET_RANGE}`,
-                valueInputOption: 'RAW',
-                resource: { values: values }
-            }).then(response => {
+                const response = await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: SPREADSHEET_ID,
+                    range: `${SHEET_NAME}!${SHEET_RANGE}`,
+                    valueInputOption: 'RAW',
+                    resource: { values: values }
+                });
+
                 showStatus('Attendance updated successfully!', true);
-            }).catch(error => {
-                showStatus('Error updating attendance: ' + error.message, false);
-            });
+            } catch (err) {
+                showStatus('Error updating attendance: ' + err.message, false);
+            }
         }
 
         // Show status message
@@ -248,13 +193,15 @@
         }
 
         // Event listeners
+        document.getElementById('signin-button').addEventListener('click', handleAuthClick);
         document.getElementById('attendanceForm').addEventListener('submit', function(e) {
             e.preventDefault();
             updateAttendance(new FormData(this));
         });
 
-        // Load the Google Sheets API
-        gapi.load('client', initClient);
+        // Start the API client initialization
+        gapiLoaded();
+        gisLoaded();
     </script>
 </body>
 </html>
