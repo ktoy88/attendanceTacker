@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System</title>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .attendance-list {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .attendance-list th,
+        .attendance-list td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .attendance-list th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .remarks-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .submit-btn {
+            display: block;
+            width: 100%;
+            max-width: 200px;
+            margin: 20px auto;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .submit-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .status-message {
+            text-align: center;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        @media (max-width: 768px) {
+            .attendance-list {
+                display: block;
+                overflow-x: auto;
+            }
+
+            .attendance-list th,
+            .attendance-list td {
+                padding: 8px;
+            }
+
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Attendance System</h1>
+        <div id="statusMessage" class="status-message"></div>
+        <form id="attendanceForm">
+            <table class="attendance-list">
+                <thead>
+                    <tr>
+                        <th>Seat No.</th>
+                        <th>Student ID</th>
+                        <th>Name</th>
+                        <th>Present</th>
+                        <th>Remarks</th>
+                    </tr>
+                </thead>
+                <tbody id="studentList">
+                    <!-- Student data will be populated here -->
+                </tbody>
+            </table>
+            <button type="submit" class="submit-btn">Update Attendance</button>
+        </form>
+    </div>
+
+    <script>
+        // Replace these with your Google Sheets API credentials
+        const API_KEY = 'AIzaSyDV21jzJELOVWONiNteDwOVyXcO9g7iW6U';
+        const SPREADSHEET_ID = '1d9bdtM78raR9O4Dt25ntXiiUUaHDUgY-xRawJIn53eU';
+        const SHEET_NAME = 'H311';
+        const SHEET_RANGE = 'A2:E'; // Assuming headers are in row 1
+
+        // Initialize the Google Sheets API
+        function initClient() {
+            gapi.client.init({
+                apiKey: API_KEY,
+                discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"],
+            }).then(() => {
+                loadStudentData();
+            }).catch(error => {
+                showStatus('Error initializing Google Sheets API: ' + error.message, false);
+            });
+        }
+
+        // Load student data from Google Sheets
+        function loadStudentData() {
+            gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEET_NAME}!${SHEET_RANGE}`,
+            }).then(response => {
+                const values = response.result.values;
+                const studentList = document.getElementById('studentList');
+                studentList.innerHTML = '';
+
+                values.forEach((row, index) => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row[0]}</td>
+                        <td>${row[1]}</td>
+                        <td>${row[2]}</td>
+                        <td>
+                            <input type="checkbox" name="status_${index}" 
+                                   ${row[3]?.toLowerCase() === 'present' ? 'checked' : ''}>
+                        </td>
+                        <td>
+                            <input type="text" class="remarks-input" name="remarks_${index}" 
+                                   value="${row[4] || ''}" placeholder="Add remarks">
+                        </td>
+                    `;
+                    studentList.appendChild(tr);
+                });
+            }).catch(error => {
+                showStatus('Error loading student data: ' + error.message, false);
+            });
+        }
+
+        // Update attendance data to Google Sheets
+        function updateAttendance(formData) {
+            const rows = document.querySelectorAll('#studentList tr');
+            const values = Array.from(rows).map((row, index) => {
+                const status = row.querySelector(`input[name="status_${index}"]`).checked ? 'Present' : 'Absent';
+                const remarks = row.querySelector(`input[name="remarks_${index}"]`).value;
+                return [
+                    row.cells[0].textContent,
+                    row.cells[1].textContent,
+                    row.cells[2].textContent,
+                    status,
+                    remarks
+                ];
+            });
+
+            gapi.client.sheets.spreadsheets.values.update({
+                spreadsheetId: SPREADSHEET_ID,
+                range: `${SHEET_NAME}!${SHEET_RANGE}`,
+                valueInputOption: 'RAW',
+                resource: { values: values }
+            }).then(response => {
+                showStatus('Attendance updated successfully!', true);
+            }).catch(error => {
+                showStatus('Error updating attendance: ' + error.message, false);
+            });
+        }
+
+        // Show status message
+        function showStatus(message, isSuccess) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status-message ' + (isSuccess ? 'success' : 'error');
+            setTimeout(() => {
+                statusDiv.textContent = '';
+                statusDiv.className = 'status-message';
+            }, 3000);
+        }
+
+        // Event listeners
+        document.getElementById('attendanceForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            updateAttendance(new FormData(this));
+        });
+
+        // Load the Google Sheets API
+        gapi.load('client', initClient);
+    </script>
+</body>
+</html>
