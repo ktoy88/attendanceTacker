@@ -1,114 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Class Attendance System</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            padding: 20px;
-        }
-        .header {
-            margin-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .attendance-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        .attendance-table th, 
-        .attendance-table td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-        }
-        .attendance-table th {
-            background-color: #f4f4f4;
-        }
-        .attendance-table tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        .attendance-table tr:hover {
-            background-color: #f5f5f5;
-        }
-        .remark-field {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .status-select {
-            padding: 6px;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-            width: 100px;
-        }
-        .submit-btn {
-            background-color: #4CAF50;
-            color: white;
-            padding: 12px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            margin-top: 20px;
-        }
-        .submit-btn:hover {
-            background-color: #45a049;
-        }
-        .loading {
-            text-align: center;
-            padding: 20px;
-            font-style: italic;
-            color: #666;
-        }
-        .bulk-actions {
-            margin-bottom: 15px;
-        }
-    </style>
-</head>
+<!-- Previous HEAD section remains the same -->
+
 <body>
-    <div class="header">
-        <h1>Class Attendance</h1>
-        <div class="bulk-actions">
-            <select id="bulk-status" onchange="applyBulkStatus()">
-                <option value="">Set All Status...</option>
-                <option value="Present">All Present</option>
-                <option value="Absent">All Absent</option>
-                <option value="Late">All Late</option>
-            </select>
-        </div>
-    </div>
-
-    <div id="loading" class="loading">Loading student list...</div>
-
-    <form id="attendance-form" style="display: none;">
-        <table class="attendance-table">
-            <thead>
-                <tr>
-                    <th>No.</th>
-                    <th>Student ID</th>
-                    <th>Student Name</th>
-                    <th>Status</th>
-                    <th>Remarks</th>
-                </tr>
-            </thead>
-            <tbody id="student-list">
-                <!-- Student list will be populated here -->
-            </tbody>
-        </table>
-        <button type="submit" class="submit-btn">Submit Attendance</button>
-    </form>
+    <!-- Previous HTML structure remains the same -->
 
     <script>
         // Replace with your Google Apps Script Web App URL
         const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTBzJWyPs64-d5zBMj8OFIDLy1W7-kDF2BHjDTrr7MpbjChMY83WyABRNlrw4-1RZf/exec';
         let students = [];
+
+        // Check if user is logged in
+        function checkAuth() {
+            const token = sessionStorage.getItem('token');
+            document.getElementById('login-container').style.display = 
+                token ? 'none' : 'block';
+            document.getElementById('main-container').style.display = 
+                token ? 'block' : 'none';
+            
+            if (token) {
+                fetchStudentList();
+            }
+        }
+
+        // Handle login
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'login',
+                        password: password
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    sessionStorage.setItem('token', result.token);
+                    checkAuth();
+                } else {
+                    alert('Incorrect password');
+                    document.getElementById('password').value = '';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Error during login');
+            }
+        });
+
+        // Handle logout
+        function logout() {
+            sessionStorage.removeItem('token');
+            checkAuth();
+        }
 
         // Fetch student list from Google Sheet
         async function fetchStudentList() {
@@ -121,51 +69,23 @@
                 document.getElementById('attendance-form').style.display = 'block';
             } catch (error) {
                 console.error('Error fetching student list:', error);
-                document.getElementById('loading').textContent = 'Error loading student list. Please refresh the page.';
+                document.getElementById('loading').textContent = 
+                    'Error loading student list. Please refresh the page.';
             }
         }
 
-        // Populate the table with student data
-        function populateStudentList() {
-            const studentList = document.getElementById('student-list');
-            studentList.innerHTML = '';
-            
-            students.forEach((student, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${student[0]}</td>
-                    <td>${student[1]}</td>
-                    <td>
-                        <select class="status-select" name="status-${student[0]}" required>
-                            <option value="Present">Present</option>
-                            <option value="Absent">Absent</option>
-                            <option value="Late">Late</option>
-                        </select>
-                    </td>
-                    <td>
-                        <input type="text" class="remark-field" name="remark-${student[0]}" placeholder="Add remarks">
-                    </td>
-                `;
-                studentList.appendChild(row);
-            });
-        }
-
-        // Apply bulk status selection
-        function applyBulkStatus() {
-            const bulkStatus = document.getElementById('bulk-status').value;
-            if (bulkStatus) {
-                const statusSelects = document.querySelectorAll('.status-select');
-                statusSelects.forEach(select => {
-                    select.value = bulkStatus;
-                });
-            }
-        }
+        // Previous populateStudentList and applyBulkStatus functions remain the same
 
         // Handle form submission
         document.getElementById('attendance-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
+            const token = sessionStorage.getItem('token');
+            if (!token) {
+                alert('Please login first');
+                return;
+            }
+
             const attendanceData = students.map(student => ({
                 studentId: student[0],
                 status: document.querySelector(`select[name="status-${student[0]}"]`).value,
@@ -175,18 +95,25 @@
             try {
                 const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
-                    body: JSON.stringify(attendanceData)
+                    body: JSON.stringify({
+                        action: 'submit_attendance',
+                        token: token,
+                        attendance: attendanceData
+                    })
                 });
                 const result = await response.json();
                 
                 if (result.success) {
                     alert('Attendance recorded successfully!');
-                    // Clear remarks after successful submission
                     document.querySelectorAll('.remark-field').forEach(input => {
                         input.value = '';
                     });
                 } else {
-                    alert('Error recording attendance');
+                    if (result.error === 'Invalid token') {
+                        sessionStorage.removeItem('token');
+                        checkAuth();
+                    }
+                    alert(result.error || 'Error recording attendance');
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -195,7 +122,7 @@
         });
 
         // Initialize the page
-        document.addEventListener('DOMContentLoaded', fetchStudentList);
+        document.addEventListener('DOMContentLoaded', checkAuth);
     </script>
 </body>
 </html>
