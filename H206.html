@@ -9,7 +9,113 @@
     <!-- Add Google OAuth client library -->
     <script src="https://accounts.google.com/gsi/client"></script>
     <style>
-        /* Previous CSS remains the same */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .attendance-list {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .attendance-list th,
+        .attendance-list td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .attendance-list th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .remarks-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .submit-btn {
+            display: block;
+            width: 100%;
+            max-width: 200px;
+            margin: 20px auto;
+            padding: 12px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .submit-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .status-message {
+            text-align: center;
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        @media (max-width: 768px) {
+            .attendance-list {
+                display: block;
+                overflow-x: auto;
+            }
+
+            .attendance-list th,
+            .attendance-list td {
+                padding: 8px;
+            }
+
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -20,7 +126,7 @@
             <button id="signin-button" class="submit-btn">Authorize</button>
         </div>
         <div id="attendance-content" style="display: none;">
-            <form id="attendanceForm">
+            <form id="attendanceForm"  >
                 <table class="attendance-list">
                     <thead>
                         <tr>
@@ -176,8 +282,10 @@
                 });
 
                 showStatus('Attendance updated successfully!', true);
+                alert('Attendance updated successfully!');
             } catch (err) {
                 showStatus('Error updating attendance: ' + err.message, false);
+                alert('Error updating attendance: ' + err.message);
             }
         }
 
