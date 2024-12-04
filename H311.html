@@ -282,8 +282,10 @@
                 });
 
                 showStatus('Attendance updated successfully!', true);
+                alert('Attendance updated successfully!');
             } catch (err) {
                 showStatus('Error updating attendance: ' + err.message, false);
+                alert('Error updating attendance: ' + err.message);
             }
         }
 
